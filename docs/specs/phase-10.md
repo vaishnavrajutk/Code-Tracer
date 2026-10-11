@@ -11,7 +11,9 @@
 - **Explaining a folded folder**, which is a different question: what's in here,
   and why does so much point at it.
 - Assigning roles to files no adapter could identify.
-- A cache for both, keyed on the content of the thing being explained.
+- A cache for both. The key is the content of the thing being explained, the
+  neighbours handed to the model (their paths and hashes), the prompt version
+  and the model name, so a change to any of them is a miss, not a stale hit.
 - **An explanation already fetched stays in the pane.** Move the selection
   away, come back, and it is still there without a second click. A cache
   nobody can feel is not a cache.

@@ -9,6 +9,9 @@ export interface FolderData extends Record<string, unknown> {
   node: DisplayNode;
   /** Null when nothing is selected; otherwise which parts stay at full strength. */
   lit: { node: boolean; rows: ReadonlySet<string>; selectedPath: string | null } | null;
+  /** Null when no rail category is active. `count` is how many of this node's
+   *  files are in it; `rows` is every matching file path. */
+  filter: { count: number; rows: ReadonlySet<string> } | null;
   selected: boolean;
   /** Hovered here or in the detail pane; a light touch, nothing dims. */
   hot: boolean;
@@ -38,13 +41,14 @@ function Counts({ fanIn, fanOut }: { fanIn: number; fanOut: number }) {
 const handleCls = "!size-1 !min-h-0 !min-w-0 !border-0 !bg-transparent";
 
 export function FolderNode({ id, data }: NodeProps<FolderFlowNode>) {
-  const { node, lit, selected, hot, hotPath, onHover, onToggle, onSelectFile, onWindow } = data;
+  const { node, lit, filter, selected, hot, hotPath, onHover, onToggle, onSelectFile, onWindow } = data;
   const update = useUpdateNodeInternals();
   // Rows come and go with the open state; tell React Flow to re-measure handles.
   useEffect(() => update(id), [id, node.open, node.rows.length, node.window, update]);
 
   const shown = node.rows.length - node.hiddenRows;
-  const dim = lit && !lit.node ? "opacity-25" : "";
+  const dim = (lit && !lit.node) || (filter && filter.count === 0) ? "opacity-25" : "";
+  const files = filter ? `${filter.count} of ${node.fileCount} files` : `${node.fileCount} files`;
   const ring = selected ? "border-accent" : hot ? "border-muted" : "border-border";
   const hoverNode = { onMouseEnter: () => onHover({ kind: "node", id: node.id }), onMouseLeave: () => onHover(null) };
 
@@ -59,7 +63,7 @@ export function FolderNode({ id, data }: NodeProps<FolderFlowNode>) {
       >
         <Handle id="in" type="target" position={Position.Left} className={handleCls} />
         <span className="truncate font-mono">{node.label}</span>
-        <span className="tabular-nums text-muted">{node.fileCount} files</span>
+        <span className="tabular-nums text-muted">{files}</span>
         <Counts fanIn={node.fanIn} fanOut={node.fanOut} />
         <Handle id="out" type="source" position={Position.Right} className={handleCls} />
       </button>
@@ -80,7 +84,7 @@ export function FolderNode({ id, data }: NodeProps<FolderFlowNode>) {
       >
         <span className="truncate font-mono">{node.label}</span>
         <span className="flex gap-2 tabular-nums">
-          <span className="text-muted">{node.fileCount} files</span>
+          <span className="text-muted">{files}</span>
           <Counts fanIn={node.fanIn} fanOut={node.fanOut} />
         </span>
       </button>
@@ -92,7 +96,8 @@ export function FolderNode({ id, data }: NodeProps<FolderFlowNode>) {
       >
         {node.rows.map((r) => {
           const isSel = lit?.selectedPath === r.path;
-          const rowDim = lit && !lit.rows.has(r.path) ? "text-muted" : "";
+          const rowDim =
+            filter && !filter.rows.has(r.path) ? "opacity-25" : lit && !lit.rows.has(r.path) ? "text-muted" : "";
           return (
             <button
               key={r.path}

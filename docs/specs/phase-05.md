@@ -6,7 +6,9 @@
 
 - **What the pane shows when nothing is selected**, which is the first thing
   anyone sees. A summary of the repository as a whole: its name, the framework
-  detected, and counts of files, imports and routes. Then two ranked lists —
+  detected, and counts of files, imports and routes. Routes come from a framework adapter
+  (phase 8); until one supplies them the pane says routes are not extracted,
+  not zero. Then two ranked lists —
   what the rest of the repository leans on most, ordered by how many things
   import it, and the files nothing imports at all, which is where reading
   starts. And a count of how many files no convention could identify.

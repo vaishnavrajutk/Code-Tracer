@@ -5,6 +5,8 @@ import { CategoryRail } from "@/components/category-rail";
 import { DetailPane, type PaneData, type Tab } from "@/components/detail-pane";
 import { DependencyMap } from "@/components/map/map";
 import { WorkspaceShell } from "@/components/workspace-shell";
+import { matchCategory, type Category } from "@/lib/graph/category";
+import { findInsights } from "@/lib/graph/insights";
 import { fold } from "@/lib/graph/fold";
 import type { Selection } from "@/lib/graph/highlight";
 import { indexEdges, summarize } from "@/lib/graph/summary";
@@ -18,6 +20,9 @@ export function Explorer({ name, result }: { name: string; result: ParseResult }
   const [hover, setHover] = useState<Selection | null>(null);
   // Lives here, not in the pane, so it survives any change of selection.
   const [tab, setTab] = useState<Tab>("structure");
+
+  // The rail's active category. Dims the map and nothing else.
+  const [category, setCategory] = useState<Category | null>(null);
 
   const { files, edges } = result;
   const graphFiles = useMemo(() => files.map(({ path, folder, fanIn, fanOut }) => ({ path, folder, fanIn, fanOut })), [files]);
@@ -33,9 +38,18 @@ export function Explorer({ name, result }: { name: string; result: ParseResult }
       byPath: new Map(files.map((f) => [f.path, f])),
       index,
       summary: summarize(files, index),
+      insights: findInsights(files, index),
       nodeFiles: new Map(folding.nodes.map((n) => [n.id, n.files])),
     };
   }, [name, result.adapter, files, edges, folding]);
+
+  const match = useMemo(
+    () =>
+      category
+        ? matchCategory(files, category, folding.nodeOf, folding.nodes.map((n) => n.id))
+        : null,
+    [category, files, folding],
+  );
 
   const nodeOf = useCallback((path: string) => folding.nodeOf.get(path) ?? ".", [folding]);
   const selectPath = useCallback(
@@ -52,7 +66,7 @@ export function Explorer({ name, result }: { name: string; result: ParseResult }
 
   return (
     <WorkspaceShell
-      rail={<CategoryRail files={files} />}
+      rail={<CategoryRail files={files} active={category} onPick={setCategory} />}
       map={
         <DependencyMap
           files={graphFiles}
@@ -61,6 +75,7 @@ export function Explorer({ name, result }: { name: string; result: ParseResult }
           onSelect={setSelection}
           hover={hover}
           onHover={setHover}
+          match={match}
         />
       }
       detail={

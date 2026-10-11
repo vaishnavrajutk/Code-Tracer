@@ -26,10 +26,12 @@
   Something in the database publishes when the stage moves, and the page
   subscribes. Publish the stage and its message, not the whole row — then the
   page has nothing to filter and nothing to interpret.
-- **The channel has to be declared before anything can publish to it.** A
-  pattern for per-analysis channels is registered as part of the migration,
-  alongside the tables. Publishing to an unregistered channel silently goes
-  nowhere, and the symptom is a progress page that simply never updates.
+- **Per-analysis channels are dynamic topics, not registered anywhere.** What
+  the migration adds, alongside the tables, is the trigger that publishes with
+  `realtime.send()` to the analysis's topic with the stage and message as
+  payload, and a policy on `realtime.messages` that authorizes subscribing.
+  Without that policy a private channel delivers nothing, and the symptom is a
+  progress page that simply never updates.
 - Publish from a trigger on our own table. Never attach a trigger to the
   realtime machinery itself.
 - **Who may subscribe is also a policy.** Another organization's analysis
@@ -41,8 +43,9 @@
 - A run that fails writes _why_ it failed and which stage it failed in.
 - **A run that dies without failing has to be visible too.** Nothing here has a
   queue or a timeout, so a process that stops mid-parse leaves a row that will
-  say "parsing" forever. The dashboard marks any unfinished run past a few
-  minutes old as stale, so the difference between working and abandoned is
+  say "parsing" forever. The dashboard marks any unfinished run that has not
+  changed stage or reported progress in a few minutes as stale — an active run
+  stays live however long it takes, so long as it keeps moving — so the difference between working and abandoned is
   legible without opening it.
 - The coverage banner may collapse, but it collapses to a single line that
   still names the figure. A graph that is quietly thirty percent complete must

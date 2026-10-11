@@ -60,8 +60,9 @@
 
 1. Node count, under roughly two dozen, and in the region of one node per ten
    files.
-2. Every node holds more than one file. Single files appearing as nodes means
-   the folding rule isn't implemented, because it cannot produce that.
+2. Every node except the root holds more than one file. Single files appearing
+   as nodes means the folding rule isn't implemented, because it cannot produce
+   that. The root has no parent to merge into, so it may hold one.
 3. Every edge terminates on a node that exists.
 
 **Then two of mine, five seconds each:**

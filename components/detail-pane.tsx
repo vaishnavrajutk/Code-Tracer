@@ -1,6 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { INSIGHT_TEXT, type Insights } from "@/lib/graph/insights";
+import { DEFAULT_DEPTH, reach, type Direction } from "@/lib/graph/reach";
 import type { Selection } from "@/lib/graph/highlight";
 import { boundary, kindCounts, typeCounts, type EdgeIndex, type RepoSummary } from "@/lib/graph/summary";
 import type { FileNode } from "@/parser/types";
@@ -14,6 +16,7 @@ export interface PaneData {
   byPath: Map<string, FileNode>;
   index: EdgeIndex;
   summary: RepoSummary;
+  insights: Insights;
   /** Folded node id -> the files inside it. */
   nodeFiles: Map<string, string[]>;
 }
@@ -93,10 +96,11 @@ export function DetailPane(props: Props) {
         ) : selection === null ? (
           <Summary {...props} />
         ) : selection.kind === "file" ? (
-          <FileView {...props} path={selection.path} />
+          <FileView key={selection.path} {...props} path={selection.path} />
         ) : (
           <FolderView data={props.data} id={selection.id} />
         )}
+        {tab === "structure" && <InsightsPanel {...props} />}
       </div>
     </div>
   );
@@ -220,7 +224,139 @@ function FileView(props: Props & { path: string }) {
       <PathList paths={imports} props={props} />
       <Heading note={String(dependents.length)}>Imported by</Heading>
       <PathList paths={dependents} props={props} />
+      <Walk props={props} path={path} />
     </>
+  );
+}
+
+const WALKS: { direction: Direction; label: string; title: string }[] = [
+  { direction: "dependents", label: "Blast radius", title: "Everything that breaks if this file changes" },
+  { direction: "imports", label: "Dependency chain", title: "Everything this file needs" },
+];
+
+// Both buttons are the same walk over the index already in memory, so the
+// list is there on the same frame as the click.
+function Walk({ props, path }: { props: Props; path: string }) {
+  const [direction, setDirection] = useState<Direction | null>(null);
+  const reached = direction ? reach(props.data.index, path, direction) : null;
+  const levels = reached ? [...new Set(reached.map((r) => r.distance))].sort((a, b) => a - b) : [];
+  return (
+    <>
+      <div className="mt-5 flex gap-1.5 border-t border-border pt-3">
+        {WALKS.map((w) => (
+          <button
+            key={w.direction}
+            type="button"
+            title={w.title}
+            aria-pressed={direction === w.direction}
+            onClick={() => setDirection(direction === w.direction ? null : w.direction)}
+            className={`flex-1 border px-2 py-1 ${direction === w.direction ? "border-accent text-accent" : "border-border hover:bg-background"}`}
+          >
+            {w.label}
+          </button>
+        ))}
+      </div>
+      {reached && direction && (
+        <>
+          <Heading note={`${reached.length} within ${DEFAULT_DEPTH} steps`}>
+            {WALKS.find((w) => w.direction === direction)?.label}
+          </Heading>
+          {reached.length === 0 && <p className="px-1 py-0.5 text-muted">none</p>}
+          {levels.map((d) => (
+            <div key={d}>
+              <p className="px-1.5 pt-1 text-[10px] text-muted">
+                {d === 1 ? "directly" : `${d} steps away`}
+              </p>
+              <PathList paths={reached.filter((r) => r.distance === d).map((r) => r.path).sort()} props={props} />
+            </div>
+          ))}
+        </>
+      )}
+    </>
+  );
+}
+
+// Starts collapsed, below everything else. Not-imported leads because it says
+// where reading starts; the two that read nearer to a verdict follow.
+function InsightsPanel(props: Props) {
+  const [open, setOpen] = useState(false);
+  const i = props.data.insights;
+  const count = i.notImported.length + i.heavilyImported.length + i.cycles.length + i.long.length;
+  return (
+    <section className="mt-5 border-t border-border pt-3">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full justify-between text-left text-[10px] uppercase tracking-wide text-muted hover:text-foreground"
+      >
+        <span>{open ? "▾" : "▸"} Insights</span>
+        <span className="tabular-nums">{count}</span>
+      </button>
+      {open && (
+        <>
+          <InsightGroup text={INSIGHT_TEXT.notImported} total={i.notImported.length}>
+            <PathList paths={i.notImported} props={props} />
+          </InsightGroup>
+          <InsightGroup
+            text={INSIGHT_TEXT.heavilyImported}
+            total={i.heavilyImported.length}
+            note={`more than ${Math.floor(i.importerThreshold)} importers`}
+          >
+            <ul>
+              {i.heavilyImported.map((r) => (
+                <PathButton key={r.path} path={r.path} note={r.count} props={props} />
+              ))}
+            </ul>
+          </InsightGroup>
+          <InsightGroup text={INSIGHT_TEXT.cycle} total={i.cycles.length}>
+            {i.cycles.map((c) => (
+              <div key={c.path[0]} className="mb-2">
+                <p className="px-1.5 text-[10px] text-muted">
+                  {c.path.length} files in a loop
+                  {c.groupSize > c.path.length ? `, ${c.groupSize} in the group` : ""}
+                </p>
+                <PathList paths={c.path} props={props} />
+                <p className="px-1.5 text-[10px] text-muted">…which imports {c.path[0]} again</p>
+              </div>
+            ))}
+          </InsightGroup>
+          <InsightGroup
+            text={INSIGHT_TEXT.long}
+            total={i.long.length}
+            note={`more than ${Math.floor(i.lineThreshold)} lines`}
+          >
+            <ul>
+              {i.long.map((r) => (
+                <PathButton key={r.path} path={r.path} note={`${fmt(r.lines)} lines`} props={props} />
+              ))}
+            </ul>
+          </InsightGroup>
+        </>
+      )}
+    </section>
+  );
+}
+
+function InsightGroup({
+  text,
+  total,
+  note,
+  children,
+}: {
+  text: string;
+  total: number;
+  note?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="mt-3">
+      <p>
+        {text} <span className="tabular-nums text-muted">{total}</span>
+        {note && total > 0 && <span className="text-muted"> · {note}</span>}
+      </p>
+      {total === 0 ? <p className="px-1 py-0.5 text-muted">none</p> : children}
+    </div>
   );
 }
 

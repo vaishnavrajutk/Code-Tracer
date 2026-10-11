@@ -4,10 +4,13 @@ export interface Adapter {
   name: string;
   /** A label for the file, or null when this adapter can't tell. */
   classify(file: { path: string; folder: string }): string | null;
+  /** True when the framework reaches this file by convention, not by import. */
+  reachedByFramework(file: { path: string; folder: string }): boolean;
 }
 
 // Assumes no framework at all, so it never claims to know what a file is.
 export const fallbackAdapter: Adapter = {
   name: "none",
   classify: () => null,
+  reachedByFramework: () => false,
 };

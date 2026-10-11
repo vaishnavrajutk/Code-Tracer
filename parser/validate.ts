@@ -33,6 +33,10 @@ function num(v: unknown, where: string): number {
   if (typeof v !== "number" || !Number.isFinite(v)) fail(where, "a number");
   return v;
 }
+function bool(v: unknown, where: string): boolean {
+  if (typeof v !== "boolean") fail(where, "a boolean");
+  return v;
+}
 function oneOf<T extends string>(v: unknown, allowed: readonly T[], where: string): T {
   const s = str(v, where);
   const hit = allowed.find((a) => a === s);
@@ -80,6 +84,7 @@ export function validateParseResult(value: unknown): ParseResult {
       bytes: num(o.bytes, `${w}.bytes`),
       hash: str(o.hash, `${w}.hash`),
       kind: o.kind === null ? null : str(o.kind, `${w}.kind`),
+      frameworkReached: bool(o.frameworkReached, `${w}.frameworkReached`),
       fanIn: num(o.fanIn, `${w}.fanIn`),
       fanOut: num(o.fanOut, `${w}.fanOut`),
     };

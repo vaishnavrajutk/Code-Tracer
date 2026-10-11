@@ -1,7 +1,7 @@
 // The shape `parseDirectory` returns and the CLI writes to disk. Everything
 // built after the parser reads this, so changing it is a contract change:
 // bump SCHEMA_VERSION.
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const EDGE_KINDS = ["import", "re-export", "dynamic-import"] as const;
 export type EdgeKind = (typeof EDGE_KINDS)[number];
@@ -64,6 +64,10 @@ export interface FileNode {
   hash: string;
   /** What the adapter says this file is, or null when it can't tell. */
   kind: string | null;
+  /** The adapter says a framework reaches this file without an import (a
+   *  page, route, layout, middleware, config). The import graph can't show
+   *  that, so "nothing imports it" means nothing for these files. */
+  frameworkReached: boolean;
   /** Distinct files importing this one / distinct files this one imports. */
   fanIn: number;
   fanOut: number;

@@ -95,6 +95,7 @@ export function parseDirectory(
         bytes: buf.length,
         hash: crypto.createHash("sha256").update(buf).digest("hex"),
         kind: adapter.classify({ path: c.path, folder }),
+        frameworkReached: adapter.reachedByFramework({ path: c.path, folder }),
         fanIn: 0,
         fanOut: 0,
       },

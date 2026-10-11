@@ -12,8 +12,9 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useCallback, useMemo, useState } from "react";
+import type { CategoryMatch } from "@/lib/graph/category";
 import { highlight, type Selection } from "@/lib/graph/highlight";
-import { layoutGraph, type GraphEdge, type GraphFile, type Layout } from "@/lib/graph/layout";
+import { ABOVE, BELOW, layoutGraph, type GraphEdge, type GraphFile, type Layout } from "@/lib/graph/layout";
 import { FolderNode, type FolderFlowNode } from "./folder-node";
 
 const nodeTypes = { folder: FolderNode };
@@ -59,9 +60,11 @@ interface MapProps {
   onSelect: (s: Selection | null) => void;
   hover: Selection | null;
   onHover: (s: Selection | null) => void;
+  /** The active rail category's matches; null when none is active. */
+  match: CategoryMatch | null;
 }
 
-function MapInner({ files, edges, selection, onSelect, hover, onHover }: MapProps) {
+function MapInner({ files, edges, selection, onSelect, hover, onHover, match }: MapProps) {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   // First row in view per open panel; only edge endpoints depend on it.
   const [windows, setWindows] = useState<ReadonlyMap<string, number>>(new Map());
@@ -80,10 +83,12 @@ function MapInner({ files, edges, selection, onSelect, hover, onHover }: MapProp
       setOpen(next);
       // A panel reopens scrolled to the top.
       setWindows((w) => (w.has(id) ? new Map([...w].filter(([k]) => k !== id)) : w));
-      onSelect({ kind: "node", id });
+      // Opening the folder that holds the selected file keeps that file selected.
+      const keep = opening && selection?.kind === "file" && selection.node === id;
+      if (!keep) onSelect({ kind: "node", id });
       if (opening) refit(layoutGraph(files, edges, next, windows), id);
     },
-    [open, windows, files, edges, refit, onSelect],
+    [open, windows, files, edges, refit, onSelect, selection],
   );
   const setWindow = useCallback(
     (id: string, first: number) =>
@@ -112,6 +117,7 @@ function MapInner({ files, edges, selection, onSelect, hover, onHover }: MapProp
               }
             : null,
           // A selected file in a folded node can't show a row, so its node is ringed.
+          filter: match ? { count: match.perNode.get(n.id) ?? 0, rows: match.files } : null,
           selected:
             (selection?.kind === "node" && selection.id === n.id) ||
             (selection?.kind === "file" && selection.node === n.id && !n.open),
@@ -123,7 +129,7 @@ function MapInner({ files, edges, selection, onSelect, hover, onHover }: MapProp
           onWindow: setWindow,
         },
       })),
-    [layout, lit, selection, hover, toggle, selectFile, setWindow, onHover],
+    [layout, lit, match, selection, hover, toggle, selectFile, setWindow, onHover],
   );
 
   const flowEdges = useMemo<Edge[]>(
@@ -132,7 +138,14 @@ function MapInner({ files, edges, selection, onSelect, hover, onHover }: MapProp
         const dir = lit?.edges.get(e.id);
         // Colour is direction, and only relative to something selected.
         const color = dir === "in" ? "var(--incoming)" : dir === "out" ? "var(--outgoing)" : "var(--muted)";
-        const faded = lit !== null && dir === undefined;
+        // With a category active, an edge is dimmed when either end sits on a
+        // node or row outside it.
+        const outside = (node: string, row: string | null) =>
+          match !== null &&
+          ((match.perNode.get(node) ?? 0) === 0 ||
+            (row !== null && row !== ABOVE && row !== BELOW && !match.files.has(row)));
+        const faded =
+          (lit !== null && dir === undefined) || outside(e.source, e.sourceRow) || outside(e.target, e.targetRow);
         return {
           id: e.id,
           source: e.source,
@@ -143,7 +156,7 @@ function MapInner({ files, edges, selection, onSelect, hover, onHover }: MapProp
           markerEnd: { type: MarkerType.ArrowClosed, color, width: 12, height: 12 },
         };
       }),
-    [layout, lit],
+    [layout, lit, match],
   );
 
   return (

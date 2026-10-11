@@ -14,7 +14,9 @@
 
 - This touches the parser core, which nothing else in the build does. Resolution
   behaviour for existing imports must not change: re-run the parser against a
-  repository parsed before this change and get an identical edge list.
+  repository parsed before this change and every edge it had then is still
+  there, identical. Literal `require()` calls add new edges; those are expected
+  and checked separately.
 - A file that mixes `require()` and `import` reports both, without duplicates.
 - Express routes are **not** extracted. They're assembled at runtime from
   routers, variables and middleware chains, and the route rule says exact or
@@ -27,8 +29,10 @@
 2. That same repository previously reported **100% coverage** — because it
    resolved 100% of the zero imports it knew how to look for. Confirm coverage
    now reports a real denominator.
-3. Re-run the parser against a repository analysed before this change. The
-   edge list is byte-identical.
+3. Re-run the parser against a repository analysed before this change. Every
+   pre-existing import edge is byte-identical; the only additions are edges from
+   literal `require()` calls, and running the new parser twice gives the same
+   list both times.
 
 ## Not in this phase
 

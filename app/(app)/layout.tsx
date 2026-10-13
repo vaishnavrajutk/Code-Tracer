@@ -1,4 +1,5 @@
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
+import { BackToDashboard } from "@/components/back-to-dashboard";
 import { ThemeControl } from "@/components/theme-control";
 
 // The shell later phases render inside: a top bar, then the workspace.
@@ -9,6 +10,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
         <div className="flex items-center gap-3">
           <span className="font-mono">code-tracer</span>
           <OrganizationSwitcher hidePersonal />
+          <BackToDashboard />
         </div>
         <div className="flex items-center gap-3">
           <ThemeControl />

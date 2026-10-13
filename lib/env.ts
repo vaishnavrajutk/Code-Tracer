@@ -15,4 +15,5 @@ export const env = {
   clerkSecretKey: required("CLERK_SECRET_KEY"),
   supabaseUrl: required("NEXT_PUBLIC_SUPABASE_URL"),
   supabasePublishableKey: required("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
+  supabaseSecretKey: required("SUPABASE_SECRET_KEY"),
 };

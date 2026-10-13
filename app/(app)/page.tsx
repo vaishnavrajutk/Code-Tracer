@@ -1,24 +1,18 @@
+import Link from "next/link";
+import { AnalyseForm } from "@/components/analyse-form";
+import { LiveState } from "@/components/live-state";
 import { createSupabaseClient } from "@/lib/supabase/server";
-
-type Status = "queued" | "parsing" | "complete" | "failed";
 
 type AnalysisRow = {
   id: string;
-  status: Status;
+  status: string;
+  stage: string;
+  message: string | null;
   commit_sha: string | null;
   created_at: string;
   finished_at: string | null;
   error: string | null;
   projects: { repo_url: string } | null;
-};
-
-// State is told by shape, not colour: colour is reserved for direction and
-// kind. An open ring is waiting, a half is in progress, a dot is finished.
-const STATE: Record<Status, { glyph: string; strong: boolean }> = {
-  queued: { glyph: "○", strong: false },
-  parsing: { glyph: "◐", strong: false },
-  complete: { glyph: "●", strong: true },
-  failed: { glyph: "✕", strong: true },
 };
 
 function ago(iso: string): string {
@@ -36,7 +30,7 @@ export default async function Dashboard() {
   const [analyses, orgs] = await Promise.all([
     supabase
       .from("analyses")
-      .select("id, status, commit_sha, created_at, finished_at, error, projects(repo_url)")
+      .select("id, status, stage, message, commit_sha, created_at, finished_at, error, projects(repo_url)")
       .order("created_at", { ascending: false })
       .limit(100)
       .overrideTypes<AnalysisRow[], { merge: false }>(),
@@ -52,6 +46,7 @@ export default async function Dashboard() {
 
   return (
     <div className="p-3">
+      <AnalyseForm />
       <div className="mb-2 flex items-baseline gap-2">
         {orgName && <h1 className="text-sm font-medium">{orgName}</h1>}
         <span className="text-xs text-muted">
@@ -76,7 +71,6 @@ export default async function Dashboard() {
             </thead>
             <tbody>
               {rows.map((a) => {
-                const state = STATE[a.status];
                 const [owner, name] = (a.projects?.repo_url ?? "").split("/");
                 return (
                   <tr
@@ -84,25 +78,29 @@ export default async function Dashboard() {
                     className="border-b border-border align-top last:border-b-0 hover:bg-background"
                   >
                     <td className="px-3 py-1.5 font-mono">
-                      {name ? (
-                        <>
-                          <span className="text-muted">{owner}/</span>
-                          {name}
-                        </>
-                      ) : (
-                        owner
-                      )}
+                      <Link href={a.status === "complete" ? `/analyses/${a.id}/map` : `/analyses/${a.id}`}>
+                        {name ? (
+                          <>
+                            <span className="text-muted">{owner}/</span>
+                            {name}
+                          </>
+                        ) : (
+                          owner
+                        )}
+                      </Link>
                     </td>
                     <td className="px-3 py-1.5">
-                      <div className={state.strong ? "" : "text-muted"}>
-                        <span aria-hidden className="mr-1.5 inline-block w-3">
-                          {state.glyph}
-                        </span>
-                        {a.status}
-                      </div>
-                      {a.error && <div className="pl-[1.125rem] text-muted">{a.error}</div>}
+                      <Link href={`/analyses/${a.id}`} className="block">
+                        <LiveState
+                          id={a.id}
+                          initial={{
+                            stage: a.stage,
+                            message: a.stage === "failed" ? a.error : a.message,
+                          }}
+                        />
+                      </Link>
                     </td>
-                    <td className="px-3 py-1.5 font-mono text-muted">{a.commit_sha ?? "—"}</td>
+                    <td className="px-3 py-1.5 font-mono text-muted">{a.commit_sha?.slice(0, 7) ?? "—"}</td>
                     <td
                       className="px-3 py-1.5 text-right tabular-nums text-muted"
                       title={a.created_at}
